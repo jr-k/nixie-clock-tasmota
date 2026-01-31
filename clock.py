@@ -1,35 +1,31 @@
 #!/bin/python3
 import paho.mqtt.client as mqtt
-import toml
 import requests
 import time
 import threading
 import json
+import os
 from datetime import datetime
-from config import config
 
-topic = config['topic']
+# Configuration via Environment Variables
+TASMOTA_HOST = os.getenv('TASMOTA_HOST', '192.168.1.103')
+ENABLE_MQTT = os.getenv('ENABLE_MQTT', 'true').lower() == 'true'
+
+# MQTT Configuration
+MQTT_HOST = os.getenv('MQTT_HOST', 'localhost')
+MQTT_TOPIC = os.getenv('MQTT_TOPIC', 'clock')
+MQTT_PORT = int(os.getenv('MQTT_PORT', 1883))
+MQTT_USERNAME = os.getenv('MQTT_USERNAME', '')
+MQTT_PASSWORD = os.getenv('MQTT_PASSWORD', '')
+
+TASMOTA_URL = "http://{}/cm".format(TASMOTA_HOST)
+
+client = None
 
 # Util functions
 def pad_with_zeros(s):
     s = ''.join(filter(str.isdigit, s))
     return s.zfill(6)[:6]
-
-# Load TOML mqtt configuration
-toml_config = toml.load(config['mqtt_toml_file'])
-mqtt_config = toml_config['snips-common']
-TASMOTA_URL = "http://{}/cm".format(config['tasmota_host'])
-
-# Load MQTT client
-client = mqtt.Client()
-
-def notify_state():
-    global MODE, DISPLAY, config
-    client.publish(config['topic'] + "/state", json.dumps({
-        "mode": MODE,
-        "at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        "display": DISPLAY
-    }))
 
 # All clock modes and display state
 MODE_TIME = 'time'
@@ -39,6 +35,20 @@ MODE_INCR = 'increment'
 MODE_CUST = 'custom'
 
 MODE = MODE_TIME
+DISPLAY = "000000"
+
+def notify_state():
+    global MODE, DISPLAY, client
+    if not ENABLE_MQTT or client is None:
+        return
+    try:
+        client.publish(MQTT_TOPIC + "/state", json.dumps({
+            "mode": MODE,
+            "at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "display": DISPLAY
+        }))
+    except Exception as e:
+        print(f"MQTT Publish Error: {e}")
 
 def s_display(msg):
     global DISPLAY
@@ -46,7 +56,7 @@ def s_display(msg):
     #print(f'Display: {DISPLAY}')
 
 def s_mode(smode):
-    global MODE, DISPLAY, client
+    global MODE, DISPLAY
     #print(f'Mode: {smode}')
     MODE = smode
     notify_state()
@@ -112,27 +122,43 @@ def on_log(client, userdata, level, buf):
     if level == mqtt.MQTT_LOG_ERR:
         print("Error:", buf)
 
-# Mqtt connect
-client.username_pw_set(mqtt_config['mqtt_username'], mqtt_config['mqtt_password'])
-client.connect(mqtt_config['mqtt'].split(":")[0], int(mqtt_config['mqtt'].split(":")[1]))
+# Initialize MQTT if enabled
+if ENABLE_MQTT:
+    print(f"Initializing MQTT connection to {MQTT_HOST}:{MQTT_PORT}...")
+    client = mqtt.Client()
+    if MQTT_USERNAME and MQTT_PASSWORD:
+        client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
+    
+    try:
+        client.connect(MQTT_HOST, MQTT_PORT)
+        
+        # Mqtt subscribe
+        client.subscribe(MQTT_TOPIC + "/#")
+        client.on_message = on_message
+        client.on_log = on_log
 
-# Mqtt subscribe
-client.subscribe(config['topic'] + "/#")
-client.on_message = on_message
-client.on_log = on_log
+        # Mqtt thread start
+        mqtt_thread = threading.Thread(target=client.loop_start)
+        mqtt_thread.start()
 
-# Mqtt thread start
-mqtt_thread = threading.Thread(target=client.loop_start)
-mqtt_thread.start()
+        # Startup configuration
+        start_payload = json.dumps({"at": datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
+        client.publish(MQTT_TOPIC + "/start", start_payload)
+        client.publish(MQTT_TOPIC + "/clear", start_payload)
+        client.publish(MQTT_TOPIC + "/time", start_payload)
+        print("MQTT initialized and started.")
+    except Exception as e:
+        print(f"Failed to connect to MQTT: {e}")
+        print("Continuing without MQTT.")
+        client = None
+else:
+    print("MQTT is disabled via configuration.")
 
-# Startup configuration
-start_payload = json.dumps({"at": datetime.now().strftime('%Y-%m-%d %H:%M:%S')})
-client.publish(config['topic'] + "/start", start_payload)
-client.publish(config['topic'] + "/clear", start_payload)
-client.publish(config['topic'] + "/time", start_payload)
+# Initial display set
 s_display(0)
 
 # Main loop for timed events
+print("Starting main loop...")
 while True:
     if MODE == MODE_TIME:
         current_time = time.strftime('%H%M%S')

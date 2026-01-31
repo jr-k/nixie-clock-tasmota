@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  nixie-clock:
+    build: .
+    restart: unless-stopped
+    # Mount source code for hot reloading if you were using a reloader (not enabled in script currently)
+    # volumes:
+    #   - ./:/app
+    environment:
+      - TASMOTA_HOST=${TASMOTA_HOST:-192.168.1.103}
+      - MQTT_TOPIC=${MQTT_TOPIC:-clock}
+      - ENABLE_MQTT=${ENABLE_MQTT:-false}
+      - MQTT_HOST=${MQTT_HOST:-host.docker.internal}
+      - MQTT_PORT=${MQTT_PORT:-1883}
+      - MQTT_USERNAME=${MQTT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+    # network_mode: "host" # Uncomment if you need to access devices on the host network more easily

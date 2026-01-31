@@ -6,6 +6,8 @@ __pycache__
 ._*
 config.py
 .DS_Store
+.env
+
 
 *___jb_old___
 *___jb_tmp___
