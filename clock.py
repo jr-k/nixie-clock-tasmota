@@ -10,6 +10,11 @@ from datetime import datetime
 # Configuration via Environment Variables
 TASMOTA_HOST = os.getenv('TASMOTA_HOST', '192.168.1.103')
 ENABLE_MQTT = os.getenv('ENABLE_MQTT', 'true').lower() == 'true'
+TZ = os.getenv('TZ', 'Europe/Paris')
+
+if TZ:
+    os.environ['TZ'] = TZ
+    time.tzset()
 
 # MQTT Configuration
 MQTT_HOST = os.getenv('MQTT_HOST', 'localhost')

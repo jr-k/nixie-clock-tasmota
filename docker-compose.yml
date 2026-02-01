@@ -15,4 +15,5 @@ services:
       - MQTT_PORT=${MQTT_PORT:-1883}
       - MQTT_USERNAME=${MQTT_USERNAME}
       - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - TZ=${TZ:-Europe/Paris}
     # network_mode: "host" # Uncomment if you need to access devices on the host network more easily
