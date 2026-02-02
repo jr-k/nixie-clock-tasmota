@@ -23,6 +23,10 @@ The application is configured using environment variables.
 | `MQTT_USERNAME` | *(empty)* | MQTT Username (optional). |
 | `MQTT_PASSWORD` | *(empty)* | MQTT Password (optional). |
 
+## MQTT Documentation
+
+For more details on available MQTT commands and topics, please refer to the dedicated documentation: [MQTT.md](MQTT.md).
+
 ## Installation & Running
 
 ### Using Docker Compose (Recommended for Dev)
